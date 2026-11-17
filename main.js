@@ -89,6 +89,15 @@
       s += `<rect x="54" y="142" width="92" height="16" rx="3" fill="none" stroke="${a}" stroke-width="2" opacity=".6"/>`;
       return s;
     },
+    monitor(a, b, r) {
+      // Backdrop for the hero monitor: gradient with pixel noise. The screen itself is HTML.
+      let s = `<defs><linearGradient id="mon" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>`;
+      s += `<rect width="${S}" height="${S}" fill="url(#mon)"/>`;
+      for (let x = 0; x < S; x += 10)
+        for (let y = 0; y < S; y += 10)
+          if (r() > 0.82) s += `<rect x="${x}" y="${y}" width="10" height="10" fill="#15121d" opacity="${0.08 + r() * 0.18}"/>`;
+      return s;
+    },
     avatar(a, b, r) {
       // Pixel-art portrait monitor: amber CRT with initials
       let s = `<defs><linearGradient id="av" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>`;
@@ -119,8 +128,8 @@
     const label = el.dataset.label || "";
     const r = rng(p + label + a);
     const art = (patterns[p] || patterns.grid)(a, b, r);
-    const bg = p === "avatar" ? "" : `<rect width="${S}" height="${S}" fill="${b}"/>`;
-    const text = label && p !== "avatar"
+    const bg = p === "avatar" || p === "monitor" ? "" : `<rect width="${S}" height="${S}" fill="${b}"/>`;
+    const text = label && p !== "avatar" && p !== "monitor"
       ? `<text x="14" y="${S - 14}" font-family="Chakra Petch, sans-serif" font-weight="700" font-size="${label.length > 5 ? 26 : 32}" fill="#f3effa" letter-spacing="1">${label}</text>`
       : "";
     el.insertAdjacentHTML("afterbegin",
@@ -151,6 +160,46 @@
     });
   }, { rootMargin: "-40% 0px -55% 0px" });
   document.querySelectorAll("main section[id]").forEach((s) => io.observe(s));
+
+  // Hero monitor boot sequence: plays once per page load.
+  // The finished AK is already in the HTML, so no-JS and reduced-motion visitors see it directly.
+  (function boot() {
+    const log = document.getElementById("boot-log");
+    const ak = document.getElementById("boot-ak");
+    const flash = document.getElementById("boot-flash");
+    if (!log || !ak || !flash) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const LINES = ["ak-os v1.0", "> load builder.mod  ok", "> mount projects    ok", "> start portfolio"];
+    const CHAR_MS = 40, LINE_PAUSE_MS = 380, ROW_MS = 90;
+    const finalAk = ak.innerHTML;
+    const rows = finalAk.split("\n").slice(0, 5);
+    const cursor = '<span class="boot-cursor"></span>';
+    const at = (ms, fn) => setTimeout(fn, ms);
+
+    ak.style.visibility = "hidden";
+    at(150, () => flash.classList.add("is-on"));
+
+    let t = 750, done = "";
+    LINES.forEach((line) => {
+      for (let c = 0; c <= line.length; c++) {
+        const text = done + line.slice(0, c);
+        at(t, () => { log.innerHTML = text + cursor; });
+        t += CHAR_MS;
+      }
+      done += line + "\n";
+      t += LINE_PAUSE_MS;
+    });
+
+    t += 500;
+    at(t, () => { log.innerHTML = ""; ak.innerHTML = ""; ak.style.visibility = ""; });
+    t += 100;
+    rows.forEach((_, i) => {
+      at(t + i * ROW_MS, () => {
+        ak.innerHTML = i === rows.length - 1 ? finalAk : rows.slice(0, i + 1).join("\n");
+      });
+    });
+  })();
 
   const y = document.getElementById("year");
   if (y) y.textContent = new Date().getFullYear();
